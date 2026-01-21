@@ -1,13 +1,9 @@
-catalogMode: prefer
-ignoreWorkspaceRootCheck: true
-shellEmulator: true
-trustPolicy: no-downgrade
+catalog:
+  axios: ^1.7.9
+  citty: ^0.1.6
+  form-data: ^4.0.5
 
-packages:
-  - playground
-  - docs
-  - packages/*
-  - examples/*
+catalogMode: prefer
 
 catalogs:
   cli:
@@ -31,6 +27,19 @@ catalogs:
     yaml: ^2.8.2
   types:
     '@types/node': ^25.0.1
+
+ignoreWorkspaceRootCheck: true
+
 onlyBuiltDependencies:
   - esbuild
   - simple-git-hooks
+
+packages:
+  - playground
+  - docs
+  - packages/*
+  - examples/*
+
+shellEmulator: true
+
+trustPolicy: no-downgrade

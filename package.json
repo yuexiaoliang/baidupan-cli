@@ -1,19 +1,17 @@
 {
-  "name": "pkg-placeholder",
+  "name": "baidupan-cli",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "packageManager": "pnpm@10.25.0",
-  "description": "_description_",
-  "author": "Anthony Fu <anthonyfu117@hotmail.com>",
+  "description": "CLI tool for Baidu Pan file management",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/antfu",
-  "homepage": "https://github.com/antfu/pkg-placeholder#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/antfu/pkg-placeholder.git"
-  },
-  "bugs": "https://github.com/antfu/pkg-placeholder/issues",
-  "keywords": [],
+  "keywords": [
+    "baidu",
+    "baidupan",
+    "netdisk",
+    "cli",
+    "backup"
+  ],
   "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
@@ -22,6 +20,9 @@
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
+  "bin": {
+    "baidupan-cli": "./dist/index.mjs"
+  },
   "files": [
     "dist"
   ],
@@ -35,6 +36,11 @@
     "test": "vitest",
     "typecheck": "tsc",
     "prepare": "simple-git-hooks"
+  },
+  "dependencies": {
+    "axios": "catalog:",
+    "citty": "catalog:",
+    "form-data": "catalog:"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:cli",
