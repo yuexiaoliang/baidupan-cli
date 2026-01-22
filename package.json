@@ -4,7 +4,16 @@
   "version": "0.1.1-beta.2",
   "packageManager": "pnpm@10.25.0",
   "description": "CLI tool for Baidu Pan file management",
+  "author": {
+    "name": "岳晓亮",
+    "email": "hi@yuexiaoliang.com",
+    "url": "https://github.com/yuexiaoliang"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yuexiaoliang/baiduwangpan-manager"
+  },
   "keywords": [
     "baidu",
     "baidupan",
