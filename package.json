@@ -47,6 +47,7 @@
     "@antfu/ni": "catalog:cli",
     "@antfu/utils": "catalog:inlined",
     "@types/node": "catalog:types",
+    "baseline-browser-mapping": "catalog:",
     "bumpp": "catalog:cli",
     "eslint": "catalog:cli",
     "lint-staged": "catalog:cli",

@@ -84,7 +84,6 @@ export default defineCommand({
       saveTokensAndPrintSuccess(tokenData, appKey, secretKey)
     }
     catch (error) {
-      console.log(`🚀 > error:`, error.config)
       console.error('Error:', error instanceof Error ? error.message : error)
       process.exit(1)
     }

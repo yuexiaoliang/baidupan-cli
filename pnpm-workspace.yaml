@@ -1,5 +1,12 @@
+packages:
+  - playground
+  - docs
+  - packages/*
+  - examples/*
+
 catalog:
   axios: ^1.7.9
+  baseline-browser-mapping: ^2.9.17
   citty: ^0.1.6
   form-data: ^4.0.5
 
@@ -33,12 +40,6 @@ ignoreWorkspaceRootCheck: true
 onlyBuiltDependencies:
   - esbuild
   - simple-git-hooks
-
-packages:
-  - playground
-  - docs
-  - packages/*
-  - examples/*
 
 shellEmulator: true
 
