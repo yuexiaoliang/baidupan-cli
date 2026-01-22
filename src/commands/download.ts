@@ -81,6 +81,7 @@ export default defineCommand({
         headers: {
           'User-Agent': 'pan.baidu.com',
         },
+        proxy: false,
         onDownloadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percent = Math.round((progressEvent.loaded / progressEvent.total) * 100)
