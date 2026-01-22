@@ -1,8 +1,5 @@
 packages:
-  - playground
-  - docs
-  - packages/*
-  - examples/*
+  - .
 
 catalog:
   axios: ^1.7.9

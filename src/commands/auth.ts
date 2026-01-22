@@ -34,7 +34,7 @@ export default defineCommand({
     },
     redirectUri: {
       type: 'string',
-      description: 'Custom redirect URI (e.g., https://example.com/callback)',
+      description: 'Custom redirect URI (e.g., https://your-domain.com/callback)',
       alias: 'r',
     },
     port: {
