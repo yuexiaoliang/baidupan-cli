@@ -72,7 +72,7 @@ try {
   const remotePath = `${remoteDir}/${tarFile}`
   console.log('上传备份到百度网盘...')
 
-  const result = spawnSync('npx', ['--yes', 'baidupan-cli', 'upload', backupFile, remotePath], {
+  const result = spawnSync('npx', ['--yes', 'baidupan-cli@latest', 'upload', backupFile, remotePath], {
     stdio: 'inherit',
     shell: true,
   })
