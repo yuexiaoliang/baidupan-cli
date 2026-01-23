@@ -48,7 +48,8 @@
     "baidupan-cli": "./dist/index.mjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "example"
   ],
   "scripts": {
     "build": "tsdown",
