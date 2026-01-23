@@ -74,7 +74,6 @@ try {
 
   const result = spawnSync('npx', ['--yes', 'baidupan-cli@latest', 'upload', backupFile, remotePath], {
     stdio: 'inherit',
-    shell: true,
   })
 
   if (result.status === 0) {

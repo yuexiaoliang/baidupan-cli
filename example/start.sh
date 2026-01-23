@@ -17,9 +17,18 @@ fi
 echo "启动定时备份任务..."
 pm2 start "$CONFIG_FILE"
 
-echo "设置开机自启..."
+echo "保存 PM2 进程列表..."
 pm2 save
-pm2 startup
+
+# 检查是否已设置开机自启
+if systemctl is-enabled "pm2-$(whoami)" &> /dev/null 2>&1; then
+    echo "开机自启已配置，跳过..."
+else
+    echo "设置开机自启..."
+    pm2 startup
+    echo ""
+    echo "注意: 请复制上面的命令并以 sudo 执行"
+fi
 
 echo ""
 echo "启动完成！"
