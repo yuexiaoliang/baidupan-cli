@@ -41,7 +41,7 @@ export function saveConfig(config: Config): void {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 })
   }
   catch (error) {
-    logger.warn('Failed to save config:', error instanceof Error ? error.message : error)
+    logger.warn('配置保存失败:', error instanceof Error ? error.message : error)
   }
 }
 

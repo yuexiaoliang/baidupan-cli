@@ -31,7 +31,7 @@ axiosRetry(http, {
       || (error.response?.status ?? 0) >= 500
   },
   onRetry: (retryCount, error) => {
-    logger.warn(`Request failed, retry attempt ${retryCount}: ${error.message}`)
+    logger.warn(`请求失败，第 ${retryCount} 次重试: ${error.message}`)
   },
 })
 

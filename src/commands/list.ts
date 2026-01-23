@@ -53,16 +53,16 @@ export default defineCommand({
     }
 
     if (result.list.length === 0) {
-      logger.info('(empty directory)')
+      logger.info('(空目录)')
       return
     }
 
     // Print header
-    logger.log('Type\tSize\t\tModified\t\t\tName')
-    logger.log('----\t----\t\t--------\t\t\t----')
+    logger.log('类型\t大小\t\t修改时间\t\t\t文件名')
+    logger.log('----\t----\t\t--------\t\t\t------')
 
     for (const file of result.list) {
-      const type = file.isdir ? 'DIR' : 'FILE'
+      const type = file.isdir ? '目录' : '文件'
       const size = file.isdir ? '-' : formatSize(file.size)
       const modified = formatDate(file.server_mtime)
       const name = file.server_filename
@@ -71,6 +71,6 @@ export default defineCommand({
     }
 
     logger.log('')
-    logger.info(`Total: ${result.list.length} items`)
+    logger.info(`共 ${result.list.length} 项`)
   },
 })

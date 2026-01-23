@@ -50,7 +50,7 @@ export default defineCommand({
 
     // Handle stdin input
     if (localPath === '-') {
-      logger.info('Reading from stdin...')
+      logger.info('正在从标准输入读取...')
       const data = await readStdin()
       await uploadBuffer(api, data, remotePath, concurrency)
       return
@@ -58,7 +58,7 @@ export default defineCommand({
 
     // Check if local path exists
     if (!fs.existsSync(localPath)) {
-      throw new FileError(`Local path does not exist: ${localPath}`)
+      throw new FileError(`本地路径不存在: ${localPath}`)
     }
 
     // Handle directory upload
@@ -66,25 +66,25 @@ export default defineCommand({
       const files = getAllFiles(localPath)
 
       if (files.length === 0) {
-        logger.info('No files to upload')
+        logger.info('没有文件需要上传')
         return
       }
 
-      logger.info(`Found ${files.length} files to upload`)
+      logger.info(`发现 ${files.length} 个文件待上传`)
 
       let uploaded = 0
       for (const file of files) {
         const remoteFilePath = `${remotePath}/${file.relativePath}`
-        logger.info(`\nUploading: ${file.relativePath}`)
+        logger.info(`\n正在上传: ${file.relativePath}`)
 
         const data = readFileAsBuffer(file.localPath)
         await uploadBuffer(api, data, remoteFilePath, concurrency)
 
         uploaded++
-        logger.info(`Progress: ${uploaded}/${files.length} files`)
+        logger.info(`进度: ${uploaded}/${files.length} 个文件`)
       }
 
-      logger.success(`Done! Uploaded ${uploaded} files`)
+      logger.success(`上传完成！共 ${uploaded} 个文件`)
       return
     }
 
@@ -105,20 +105,20 @@ async function uploadBuffer(
   remotePath: string,
   concurrency: number,
 ): Promise<void> {
-  logger.info(`Uploading to: ${remotePath}`)
-  logger.info(`File size: ${formatSize(data.length)}`)
+  logger.info(`上传目标: ${remotePath}`)
+  logger.info(`文件大小: ${formatSize(data.length)}`)
 
   // Split into chunks and calculate MD5
   const { chunks, md5List } = splitIntoChunks(data)
-  logger.debug(`Chunks: ${chunks.length}`)
+  logger.debug(`分块数: ${chunks.length}`)
 
   // Step 1: Precreate
-  logger.start('Precreating file...')
+  logger.start('预创建文件...')
   const precreateResult = await api.precreate(remotePath, data.length, md5List)
 
   // Check if file already exists (return_type = 2)
   if (precreateResult.return_type === 2) {
-    logger.success('File already exists on server (rapid upload)')
+    logger.success('秒传成功（文件已存在）')
     return
   }
 
@@ -126,7 +126,7 @@ async function uploadBuffer(
   const blocksToUpload = precreateResult.block_list
 
   // Step 2: Upload chunks with concurrency
-  logger.start('Uploading chunks...')
+  logger.start('上传分块中...')
   const uploadedMd5List: string[] = [...md5List]
   let completed = 0
 
@@ -139,7 +139,7 @@ async function uploadBuffer(
         const chunk = chunks[blockIndex]
         const result = await api.uploadChunk(uploadId, remotePath, blockIndex, chunk)
         completed++
-        printProgress(completed, blocksToUpload.length, 'Uploading: ')
+        printProgress(completed, blocksToUpload.length, '上传中: ')
         return { blockIndex, md5: result.md5 }
       }),
     )
@@ -151,7 +151,7 @@ async function uploadBuffer(
   }
 
   // Step 3: Create file
-  logger.start('Creating file...')
+  logger.start('创建文件...')
   const createResult = await api.createFile(
     remotePath,
     data.length,
@@ -159,5 +159,5 @@ async function uploadBuffer(
     uploadedMd5List,
   )
 
-  logger.success(`Upload complete! fs_id: ${createResult.fs_id}`)
+  logger.success(`上传完成！fs_id: ${createResult.fs_id}`)
 }

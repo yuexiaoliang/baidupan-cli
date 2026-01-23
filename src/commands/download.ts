@@ -42,7 +42,7 @@ export default defineCommand({
     const dir = path.dirname(remotePath)
     const fileName = path.basename(remotePath)
 
-    logger.info(`Looking for: ${remotePath}`)
+    logger.info(`正在查找: ${remotePath}`)
 
     const listResult = await api.listFiles(dir)
     const file = listResult.list.find(
@@ -50,13 +50,13 @@ export default defineCommand({
     )
 
     if (!file) {
-      throw new FileError(`File not found: ${remotePath}`)
+      throw new FileError(`文件不存在: ${remotePath}`)
     }
 
     // Handle directory download
     if (file.isdir) {
       if (!args.recursive) {
-        throw new FileError('Cannot download a directory. Use -r flag for recursive download.')
+        throw new FileError('无法下载目录，请使用 -r 参数进行递归下载')
       }
 
       await downloadDirectory(api, remotePath, localBasePath)
@@ -73,17 +73,17 @@ async function downloadDirectory(
   remotePath: string,
   localBasePath: string,
 ): Promise<void> {
-  logger.info(`Downloading directory: ${remotePath}`)
+  logger.info(`正在下载目录: ${remotePath}`)
 
   // Get all files recursively
   const allFiles = await getAllRemoteFiles(api, remotePath)
 
   if (allFiles.length === 0) {
-    logger.info('No files to download')
+    logger.info('没有文件需要下载')
     return
   }
 
-  logger.info(`Found ${allFiles.length} files to download`)
+  logger.info(`发现 ${allFiles.length} 个文件待下载`)
 
   let downloaded = 0
   for (const file of allFiles) {
@@ -97,14 +97,14 @@ async function downloadDirectory(
       fs.mkdirSync(parentDir, { recursive: true })
     }
 
-    logger.info(`\nDownloading: ${relativePath}`)
+    logger.info(`\n正在下载: ${relativePath}`)
     await downloadFile(api, file, localFilePath, true)
 
     downloaded++
-    logger.info(`Progress: ${downloaded}/${allFiles.length} files`)
+    logger.info(`进度: ${downloaded}/${allFiles.length} 个文件`)
   }
 
-  logger.success(`Done! Downloaded ${downloaded} files`)
+  logger.success(`下载完成！共 ${downloaded} 个文件`)
 }
 
 async function getAllRemoteFiles(api: BaiduPanApi, remotePath: string): Promise<FileItem[]> {
@@ -145,20 +145,20 @@ async function downloadFile(
     }
   }
 
-  logger.info(`Found file: ${file.server_filename} (${formatSize(file.size)})`)
+  logger.info(`找到文件: ${file.server_filename} (${formatSize(file.size)})`)
 
   // Get download link
-  logger.start('Getting download link...')
+  logger.start('获取下载链接...')
   const metaResult = await api.getFileMetas([file.fs_id], true)
 
   if (!metaResult.list || metaResult.list.length === 0 || !metaResult.list[0].dlink) {
-    throw new FileError('Could not get download link')
+    throw new FileError('无法获取下载链接')
   }
 
   const dlink = metaResult.list[0].dlink
   const token = tokenManager.getAccessToken()
 
-  logger.info(`Downloading to: ${finalLocalPath}`)
+  logger.info(`下载到: ${finalLocalPath}`)
 
   // Stream download for large files
   const response = await http.get(`${dlink}&access_token=${token}`, {
@@ -178,13 +178,13 @@ async function downloadFile(
     const percent = Math.round((downloaded / total) * 100)
     const downloadedStr = formatSize(downloaded)
     const totalStr = formatSize(total)
-    process.stderr.write(`\rDownloading: ${percent}% (${downloadedStr}/${totalStr})`)
+    process.stderr.write(`\r下载中: ${percent}% (${downloadedStr}/${totalStr})`)
   })
 
   // Use pipeline for proper stream handling
   await pipeline(response.data, writer)
 
   process.stderr.write('\n')
-  logger.success('Download complete!')
-  logger.info(`Saved to: ${path.resolve(finalLocalPath)}`)
+  logger.success('下载完成！')
+  logger.info(`保存到: ${path.resolve(finalLocalPath)}`)
 }

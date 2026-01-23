@@ -39,7 +39,7 @@ class TokenManager {
     }
 
     throw new AuthError(
-      'Access token not found. Please run: baidupan-cli auth -k <app-key> -s <secret-key>',
+      '未找到 Access Token，请先运行: baidupan-cli auth -k <app-key> -s <secret-key>',
     )
   }
 
@@ -81,7 +81,7 @@ class TokenManager {
       return null
     }
 
-    logger.info('Access token expired, refreshing...')
+    logger.info('Access Token 已过期，正在刷新...')
 
     try {
       const response = await http.get<RefreshTokenResponse>(`${OPENAPI_URL}/oauth/2.0/token`, {
@@ -103,13 +103,13 @@ class TokenManager {
           expires_at: Date.now() + response.data.expires_in * 1000,
         })
 
-        logger.success('Token refreshed and saved automatically!')
+        logger.success('Token 刷新成功并已自动保存！')
         return response.data.access_token
       }
     }
     catch (error) {
-      logger.error('Failed to refresh token:', error instanceof Error ? error.message : error)
-      logger.info('Please re-run: baidupan-cli auth -k <app-key> -s <secret-key>')
+      logger.error('Token 刷新失败:', error instanceof Error ? error.message : error)
+      logger.info('请重新运行: baidupan-cli auth -k <app-key> -s <secret-key>')
     }
 
     return null
