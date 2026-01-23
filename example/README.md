@@ -1,105 +1,110 @@
 # 示例脚本：MongoDB 自动备份到百度网盘
 
-此目录包含一个示例脚本，用于自动备份 MongoDB 数据库到百度网盘。
+此目录包含 Node.js 示例脚本，用于自动备份 MongoDB 数据库到百度网盘。
 
 ## 包含的文件
 
-- `backup_mongodb.sh` - 主备份脚本
-- `setup_cron.sh` - 用于设置定时任务的脚本
-- `backup_config.json` - 配置文件
+- `backup_mongodb.mjs` - 备份脚本
+- `ecosystem.config.cjs` - PM2 定时任务配置
 
 ## 功能说明
 
-此脚本实现了以下功能：
 1. 检查 mongodump 是否存在
-2. 检查 Node.js 环境
-3. 安装本项目
-4. 执行 MongoDB 备份（连接参数通过命令行参数传入）
-5. 上传到百度网盘
-6. 支持每小时自动执行一次
+2. 执行 MongoDB 备份
+3. 压缩备份文件
+4. 上传到百度网盘
+5. 清理本地临时文件
 
 ## 使用说明
 
 ### 前置要求
 
-1. 安装 Node.js
-2. 安装 MongoDB 工具（特别是 `mongodump`）
-3. 配置百度网盘 CLI 访问权限
+1. Node.js 18+
+2. MongoDB 工具（`mongodump`）
+3. 配置百度网盘访问权限
 
 ### 配置百度网盘访问权限
 
-在运行备份脚本之前，您需要先配置百度网盘访问权限：
-
 ```bash
-# 如果还没有安装 CLI 工具
+# 安装 CLI 工具
 npm install -g baidupan-cli
 
-# 或者使用 npx 临时运行
-npx baidupan-cli auth -k <your_app_key> -s <your_secret_key>
+# 授权
+baidupan-cli auth -k <your_app_key> -s <your_secret_key>
 ```
 
 ### 手动运行备份
 
 ```bash
-# 给脚本添加执行权限
-chmod +x example/backup_mongodb.sh
+# 方式 1：通过命令行参数
+node example/backup_mongodb.mjs "mongodb://localhost:27017/mydb" "/backup/mongodb"
 
-# 运行备份脚本（使用方法：./backup_mongodb.sh <mongo_url> <remote_directory>）
-./example/backup_mongodb.sh "mongodb://localhost:27017/mydb" "/backup/mongodb"
+# 方式 2：通过环境变量
+MONGO_URL="mongodb://localhost:27017/mydb" REMOTE_DIR="/backup/mongodb" node example/backup_mongodb.mjs
 ```
 
-### 设置每小时自动运行
+### 使用 PM2 定时备份
 
 ```bash
-# 运行设置脚本，这将添加 cron 任务
-chmod +x example/setup_cron.sh
-./example/setup_cron.sh
+# 安装 PM2
+npm install -g pm2
+
+# 修改配置文件中的 MONGO_URL 和 REMOTE_DIR
+vim example/ecosystem.config.cjs
+
+# 启动定时任务（每小时执行一次）
+pm2 start example/ecosystem.config.cjs
+
+# 查看状态
+pm2 status
+
+# 查看日志
+pm2 logs mongodb-backup
+
+# 立即触发一次备份
+pm2 restart mongodb-backup
+
+# 停止任务
+pm2 stop mongodb-backup
+
+# 删除任务
+pm2 delete mongodb-backup
+
+# 设置开机自启
+pm2 save
+pm2 startup
 ```
 
-### 验证定时任务
+### 自定义定时规则
 
-```bash
-# 查看当前用户的 cron 任务
-crontab -l
+修改 `ecosystem.config.cjs` 中的 `cron_restart` 字段：
+
+```javascript
+cron_restart: '0 * * * *' // 每小时
+cron_restart: '0 2 * * *' // 每天凌晨 2 点
+cron_restart: '0 */6 * * *' // 每 6 小时
+cron_restart: '0 0 * * 0' // 每周日零点
 ```
 
 ## 配置选项
 
-使用方法：`./backup_mongodb.sh <mongo_url> <remote_directory>`
-
-参数说明：
-- `<mongo_url>`: MongoDB 连接字符串，例如 `mongodb://username:password@host:port/database`
-- `<remote_directory>`: 百度网盘远程目录路径，例如 `/backup/mongodb`
-
-示例：
-```bash
-# 备份整个 MongoDB 实例
-./backup_mongodb.sh "mongodb://localhost:27017" "/backup/mongodb"
-
-# 备份特定数据库
-./backup_mongodb.sh "mongodb://localhost:27017/mydatabase" "/backup/mongodb"
-
-# 备份带有认证信息的数据库
-./backup_mongodb.sh "mongodb://username:password@localhost:27017/mydatabase" "/backup/mongodb"
-```
-
-## 日志文件
-
-- 执行日志：`/tmp/mongodb_backup.log`
+| 参数 | 环境变量 | 说明 |
+|------|----------|------|
+| 第 1 个参数 | `MONGO_URL` | MongoDB 连接字符串 |
+| 第 2 个参数 | `REMOTE_DIR` | 百度网盘远程目录 |
 
 ## 注意事项
 
 1. 确保 MongoDB 服务正在运行
 2. 确保有足够的磁盘空间进行备份
 3. 确保网络连接稳定以上传备份文件
-4. MongoDB 连接参数应根据实际情况修改（通过命令行参数传入）
+4. PM2 需要保持运行，建议配合 `pm2 startup` 设置开机自启
 
 ## 故障排除
 
 如果遇到问题，请检查：
 
-1. Node.js 是否正确安装：`node --version`
-2. MongoDB 工具是否可用：`mongodump --version`
-3. 百度网盘 CLI 是否已配置：检查 `~/.baidupan-cli/config.json` 文件
-4. MongoDB 连接参数是否正确（通过命令行参数传入）
-5. 相关日志文件以获取更多信息
+1. Node.js 版本：`node --version`（需要 18+）
+2. MongoDB 工具：`mongodump --version`
+3. 百度网盘配置：检查 `~/.baidupan-cli/config.json`
+4. PM2 日志：`pm2 logs mongodb-backup`
