@@ -201,9 +201,6 @@ Token 过期后会自动刷新并保存。
 ```bash
 # 备份项目目录
 baidupan-cli upload ./my-project /备份/my-project/
-
-# 定时备份（配合 cron）
-0 2 * * * baidupan-cli upload /data/backup /备份/daily/
 ```
 
 #### 从网盘下载目录
@@ -213,14 +210,38 @@ baidupan-cli upload ./my-project /备份/my-project/
 baidupan-cli download /照片/2024 ./photos -r
 ```
 
-#### 管道操作
+#### 在 Node.js 脚本中使用
 
-```bash
-# 备份数据库并上传
-mysqldump -u root mydb | baidupan-cli upload - /备份/mydb.sql
+```javascript
+import { execSync, spawn } from 'node:child_process'
 
-# 列出文件并用 jq 处理
-baidupan-cli list /path --json | jq '.[] | select(.size > 1000000)'
+// 上传文件
+execSync('baidupan-cli upload ./data.json /备份/data.json')
+
+// 获取文件列表并处理
+const result = execSync('baidupan-cli list /path --json', { encoding: 'utf-8' })
+const files = JSON.parse(result)
+const largeFiles = files.filter(f => f.size > 1000000)
+console.log('大文件:', largeFiles)
+
+// 通过 stdin 上传动态内容
+const data = JSON.stringify({ time: Date.now(), data: '...' })
+const child = spawn('baidupan-cli', ['upload', '-', '/备份/snapshot.json'])
+child.stdin.write(data)
+child.stdin.end()
+```
+
+#### 定时备份（使用 node-cron）
+
+```javascript
+import { execSync } from 'node:child_process'
+import cron from 'node-cron'
+
+// 每天凌晨 2 点执行备份
+cron.schedule('0 2 * * *', () => {
+  execSync('baidupan-cli upload /data/backup /备份/daily/')
+  console.log('备份完成:', new Date().toISOString())
+})
 ```
 
 ### 故障排除
