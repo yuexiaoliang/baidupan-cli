@@ -43,12 +43,18 @@ catalogs:
     axios:
       specifier: ^1.7.9
       version: 1.13.2
+    axios-retry:
+      specifier: ^4.5.0
+      version: 4.5.0
     baseline-browser-mapping:
       specifier: ^2.9.17
       version: 2.9.17
     citty:
       specifier: ^0.1.6
       version: 0.1.6
+    consola:
+      specifier: ^3.4.2
+      version: 3.4.2
     form-data:
       specifier: ^4.0.5
       version: 4.0.5
@@ -81,9 +87,15 @@ importers:
       axios:
         specifier: 'catalog:'
         version: 1.13.2
+      axios-retry:
+        specifier: 'catalog:'
+        version: 4.5.0(axios@1.13.2)
       citty:
         specifier: 'catalog:'
         version: 0.1.6
+      consola:
+        specifier: 'catalog:'
+        version: 3.4.2
       form-data:
         specifier: 'catalog:'
         version: 4.0.5
@@ -1135,6 +1147,11 @@ packages:
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
+  axios-retry@4.5.0:
+    resolution: {integrity: sha512-aR99oXhpEDGo0UuAlYcn2iGRds30k366Zfa05XWScR9QaQD4JYiP3/1Qt1u7YlefUOK+cn0CcwoL1oefavQUlQ==}
+    peerDependencies:
+      axios: 0.x || 1.x
+
   axios@1.13.2:
     resolution: {integrity: sha512-VPk9ebNqPcy5lRGuSlKx752IlDatOjT9paPlm8A7yOuW2Fbvp4X3JznJtT4f0GzGLLiWE9W8onz51SqLYwzGaA==}
 
@@ -1814,6 +1831,10 @@ packages:
   is-number@7.0.0:
     resolution: {integrity: sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==}
     engines: {node: '>=0.12.0'}
+
+  is-retry-allowed@2.2.0:
+    resolution: {integrity: sha512-XVm7LOeLpTW4jV19QSH38vkswxoLud8sQ57YwJVTPWdiaI9I8keEhGFpBlslyVsgdQy4Opg8QOLb8YRgsyZiQg==}
+    engines: {node: '>=10'}
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
@@ -3462,6 +3483,11 @@ snapshots:
 
   asynckit@0.4.0: {}
 
+  axios-retry@4.5.0(axios@1.13.2):
+    dependencies:
+      axios: 1.13.2
+      is-retry-allowed: 2.2.0
+
   axios@1.13.2:
     dependencies:
       follow-redirects: 1.15.11
@@ -4208,6 +4234,8 @@ snapshots:
       is-extglob: 2.1.1
 
   is-number@7.0.0: {}
+
+  is-retry-allowed@2.2.0: {}
 
   isexe@2.0.0: {}
 

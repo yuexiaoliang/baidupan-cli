@@ -48,7 +48,9 @@
   },
   "dependencies": {
     "axios": "catalog:",
+    "axios-retry": "catalog:",
     "citty": "catalog:",
+    "consola": "catalog:",
     "form-data": "catalog:"
   },
   "devDependencies": {

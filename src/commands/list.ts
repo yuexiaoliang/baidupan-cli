@@ -1,6 +1,7 @@
 import { defineCommand } from 'citty'
 import { createClient } from '../api/client'
 import { BaiduPanApi } from '../api/file'
+import { logger } from '../logger'
 import { formatDate, formatSize, normalizePath } from '../utils'
 
 export default defineCommand({
@@ -40,41 +41,36 @@ export default defineCommand({
     const dir = normalizePath(args.path)
     const order = args.order as 'name' | 'time' | 'size'
 
-    try {
-      const result = await api.listFiles(dir, {
-        order,
-        desc: args.desc,
-      })
+    const result = await api.listFiles(dir, {
+      order,
+      desc: args.desc,
+    })
 
-      if (args.json) {
-        console.log(JSON.stringify(result.list, null, 2))
-        return
-      }
-
-      if (result.list.length === 0) {
-        console.log('(empty directory)')
-        return
-      }
-
-      // Print header
-      console.log('Type\tSize\t\tModified\t\t\tName')
-      console.log('----\t----\t\t--------\t\t\t----')
-
-      for (const file of result.list) {
-        const type = file.isdir ? 'DIR' : 'FILE'
-        const size = file.isdir ? '-' : formatSize(file.size)
-        const modified = formatDate(file.server_mtime)
-        const name = file.server_filename
-
-        console.log(`${type}\t${size.padEnd(10)}\t${modified}\t${name}`)
-      }
-
-      console.log('')
-      console.log(`Total: ${result.list.length} items`)
+    if (args.json) {
+      // JSON output goes to stdout for piping
+      process.stdout.write(`${JSON.stringify(result.list, null, 2)}\n`)
+      return
     }
-    catch (error) {
-      console.error('Error:', error instanceof Error ? error.message : error)
-      process.exit(1)
+
+    if (result.list.length === 0) {
+      logger.info('(empty directory)')
+      return
     }
+
+    // Print header
+    logger.log('Type\tSize\t\tModified\t\t\tName')
+    logger.log('----\t----\t\t--------\t\t\t----')
+
+    for (const file of result.list) {
+      const type = file.isdir ? 'DIR' : 'FILE'
+      const size = file.isdir ? '-' : formatSize(file.size)
+      const modified = formatDate(file.server_mtime)
+      const name = file.server_filename
+
+      logger.log(`${type}\t${size.padEnd(10)}\t${modified}\t${name}`)
+    }
+
+    logger.log('')
+    logger.info(`Total: ${result.list.length} items`)
   },
 })

@@ -25,11 +25,12 @@ export function formatDate(timestamp: number): string {
 /**
  * Normalize remote path (ensure starts with /)
  */
-export function normalizePath(remotePath: string): string {
-  if (!remotePath.startsWith('/')) {
-    return `/${remotePath}`
+export function normalizePath(remotePath: string | number): string {
+  const pathStr = String(remotePath)
+  if (!pathStr.startsWith('/')) {
+    return `/${pathStr}`
   }
-  return remotePath
+  return pathStr
 }
 
 /**

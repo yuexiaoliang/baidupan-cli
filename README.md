@@ -1,48 +1,304 @@
-# 百度网盘管理器使用文档
+# baidupan-cli
 
-## 概述
+[English](#english) | [中文](#中文)
 
-这是一个基于命令行的百度网盘管理工具，允许您通过命令行界面上传、下载、列出和管理您的百度网盘文件。
+---
 
-## 安装
+## English
+
+A command-line tool for managing Baidu Pan (Baidu Netdisk), supporting upload, download, and file listing.
+
+### Installation
+
+```bash
+# Global install
+npm install -g baidupan-cli
+
+# Or using pnpm
+pnpm add -g baidupan-cli
+```
+
+### Getting Started
+
+#### 1. Get Baidu Developer Credentials
+
+1. Visit [Baidu Pan Open Platform](https://pan.baidu.com/union/console/applist)
+2. Create an application and get `App Key` and `Secret Key`
+3. Add a redirect URI in app settings (not required if using default `oob` mode)
+
+#### 2. Authorization
+
+```bash
+# Option 1: Via arguments
+baidupan-cli auth -k <app-key> -s <secret-key>
+
+# Option 2: Via environment variables
+export BAIDU_APP_KEY=<app-key>
+export BAIDU_SECRET_KEY=<secret-key>
+baidupan-cli auth
+```
+
+Authorization flow:
+1. The program displays an authorization URL and opens the browser
+2. Complete authorization on Baidu's page
+3. Copy the `code` parameter from the browser
+4. Enter the authorization code in the terminal
+
+After successful authentication, the token is automatically saved locally.
+
+### Commands
+
+#### Global Options
+
+All commands support the following global options:
+
+| Option | Alias | Description |
+|--------|-------|-------------|
+| `--quiet` | `-q` | Quiet mode, reduce output |
+| `--verbose` | `-v` | Verbose mode, show debug info |
+
+#### list - List Files
+
+List files and directories in Baidu Pan.
+
+```bash
+# List root directory
+baidupan-cli list
+
+# List specific directory
+baidupan-cli list /path/to/directory
+
+# Sort by modification time (descending)
+baidupan-cli list / -o time -d
+
+# Sort by size (ascending)
+baidupan-cli list / -o size
+
+# Output as JSON (for piping)
+baidupan-cli list / --json
+```
+
+**Options:**
+
+| Option | Alias | Description | Default |
+|--------|-------|-------------|---------|
+| `path` | - | Directory path (positional) | `/` |
+| `--order` | `-o` | Sort by: name, time, size | `name` |
+| `--desc` | `-d` | Descending order | `false` |
+| `--json` | `-j` | Output as JSON | `false` |
+
+#### upload - Upload Files
+
+Upload local files or directories to Baidu Pan.
+
+```bash
+# Upload a single file
+baidupan-cli upload ./file.txt /remote/file.txt
+
+# Upload to a directory
+baidupan-cli upload ./file.txt /remote/path/
+
+# Upload entire directory
+baidupan-cli upload ./local-dir /remote/backup/
+
+# Upload from stdin
+echo "hello" | baidupan-cli upload - /remote/hello.txt
+cat data.json | baidupan-cli upload - /remote/data.json
+
+# Set concurrency (for faster large file uploads)
+baidupan-cli upload ./large-file.zip /remote/ -c 5
+```
+
+**Options:**
+
+| Option | Alias | Description | Default |
+|--------|-------|-------------|---------|
+| `local` | - | Local path (positional), use `-` for stdin | Required |
+| `remote` | - | Remote path (positional) | Required |
+| `--concurrency` | `-c` | Concurrent chunk uploads | `3` |
+
+#### download - Download Files
+
+Download files or directories from Baidu Pan.
+
+```bash
+# Download to current directory
+baidupan-cli download /remote/file.txt
+
+# Download to specific path
+baidupan-cli download /remote/file.txt ./local-file.txt
+
+# Download to specific directory
+baidupan-cli download /remote/file.txt ./downloads/
+
+# Download directory recursively
+baidupan-cli download /remote/directory ./local-dir -r
+```
+
+**Options:**
+
+| Option | Alias | Description | Default |
+|--------|-------|-------------|---------|
+| `remote` | - | Remote path (positional) | Required |
+| `local` | - | Local save path (positional) | `.` |
+| `--recursive` | `-r` | Download directory recursively | `false` |
+
+#### auth - Authorization
+
+Authorize with Baidu Pan.
+
+```bash
+baidupan-cli auth -k <app-key> -s <secret-key>
+
+# With custom redirect URI
+baidupan-cli auth -k <app-key> -s <secret-key> -r https://example.com/callback
+```
+
+**Options:**
+
+| Option | Alias | Description | Default |
+|--------|-------|-------------|---------|
+| `--appKey` | `-k` | Baidu App Key | Env var |
+| `--secretKey` | `-s` | Baidu Secret Key | Env var |
+| `--redirectUri` | `-r` | Redirect URI | `oob` |
+
+### Command Aliases
+
+| Alias | Command |
+|-------|---------|
+| `ls` | `list` |
+| `up` | `upload` |
+| `dl` | `download` |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `BAIDU_APP_KEY` | Baidu App Key |
+| `BAIDU_SECRET_KEY` | Baidu Secret Key |
+| `BAIDU_ACCESS_TOKEN` | Access Token (optional, takes priority over config) |
+| `BAIDU_REFRESH_TOKEN` | Refresh Token (optional) |
+
+### Config File
+
+Credentials are saved at:
+
+- **Windows**: `%USERPROFILE%\.baidupan-cli\config.json`
+- **macOS/Linux**: `~/.baidupan-cli/config.json`
+
+Config format:
+
+```json
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "app_key": "...",
+  "secret_key": "...",
+  "expires_at": 1234567890000
+}
+```
+
+Tokens are automatically refreshed when expired.
+
+### Examples
+
+#### Backup local directory
+
+```bash
+# Backup project
+baidupan-cli upload ./my-project /backup/my-project/
+
+# Scheduled backup (with cron)
+0 2 * * * baidupan-cli upload /data/backup /backup/daily/
+```
+
+#### Download directory
+
+```bash
+baidupan-cli download /photos/2024 ./photos -r
+```
+
+#### Pipe operations
+
+```bash
+# Backup database and upload
+mysqldump -u root mydb | baidupan-cli upload - /backup/mydb.sql
+
+# List files and process with jq
+baidupan-cli list /path --json | jq '.[] | select(.size > 1000000)'
+```
+
+### Troubleshooting
+
+#### Authorization Issues
+- Verify App Key and Secret Key are correct
+- If using custom redirect URI, ensure it's added in Baidu Open Platform
+
+#### Network Issues
+- Ensure Baidu Pan API is accessible
+- Auto-retry is enabled (3 retries with exponential backoff)
+
+#### File Operations
+- Remote paths must start with `/`
+- Large files are automatically chunked
+- Rapid upload supported (identical files skip upload)
+
+---
+
+## 中文
+
+基于命令行的百度网盘管理工具，支持上传、下载、列出文件等操作。
+
+### 安装
 
 ```bash
 # 全局安装
 npm install -g baidupan-cli
 
-# 或者使用 pnpm
+# 或使用 pnpm
 pnpm add -g baidupan-cli
 ```
 
-## 首次配置
+### 首次配置
 
-在使用该工具前，您需要先进行授权认证。
-
-### 获取百度开发者凭证
+#### 1. 获取百度开发者凭证
 
 1. 访问 [百度网盘开放平台](https://pan.baidu.com/union/console/applist)
 2. 创建应用并获取 `App Key` 和 `Secret Key`
-3. 在应用设置中添加重定向 URL：`http://localhost:9876/callback`
+3. 在应用设置中添加回调地址（如使用默认 `oob` 模式则无需配置）
 
-### 授权认证
-
-使用以下命令进行首次授权：
+#### 2. 授权认证
 
 ```bash
-# 方式1：通过参数指定
-baidupan-cli auth -k <your-app-key> -s <your-secret-key>
+# 方式 1：通过参数指定
+baidupan-cli auth -k <app-key> -s <secret-key>
 
-# 方式2：通过环境变量
-export BAIDU_APP_KEY=<your-app-key>
-export BAIDU_SECRET_KEY=<your-secret-key>
+# 方式 2：通过环境变量
+export BAIDU_APP_KEY=<app-key>
+export BAIDU_SECRET_KEY=<secret-key>
 baidupan-cli auth
 ```
 
-认证成功后，访问令牌会被自动保存到本地配置文件中，后续操作无需重复认证。
+授权流程：
+1. 程序会显示授权链接并自动打开浏览器
+2. 在百度页面完成授权
+3. 从浏览器复制 `code` 参数值
+4. 在终端中输入授权码完成认证
 
-## 命令说明
+认证成功后，Token 会自动保存到本地配置文件，后续操作无需重复认证。
 
-### 1. 列出文件 (list)
+### 命令说明
+
+#### 全局参数
+
+所有命令都支持以下全局参数：
+
+| 参数 | 别名 | 说明 |
+|------|------|------|
+| `--quiet` | `-q` | 安静模式，减少输出 |
+| `--verbose` | `-v` | 详细模式，显示调试信息 |
+
+#### list - 列出文件
 
 列出百度网盘中的文件和目录。
 
@@ -53,116 +309,185 @@ baidupan-cli list
 # 列出指定目录
 baidupan-cli list /path/to/directory
 
-# 按修改时间排序（降序）
+# 按修改时间降序排列
 baidupan-cli list / -o time -d
 
-# 按大小排序（升序）
+# 按大小升序排列
 baidupan-cli list / -o size
 
-# 输出为 JSON 格式
+# 输出 JSON 格式（便于管道处理）
 baidupan-cli list / --json
 ```
 
-参数说明：
-- `path`: 目录路径，默认为 `/`
-- `-o, --order`: 排序方式（name, time, size），默认为 name
-- `-d, --desc`: 降序排列
-- `-j, --json`: 输出为 JSON 格式
+**参数：**
 
-### 2. 上传文件 (upload)
+| 参数 | 别名 | 说明 | 默认值 |
+|------|------|------|--------|
+| `path` | - | 目录路径（位置参数） | `/` |
+| `--order` | `-o` | 排序方式：name, time, size | `name` |
+| `--desc` | `-d` | 降序排列 | `false` |
+| `--json` | `-j` | 输出 JSON 格式 | `false` |
+
+#### upload - 上传文件
 
 将本地文件或目录上传到百度网盘。
 
 ```bash
 # 上传单个文件
-baidupan-cli upload ./local-file.txt /remote-path/file.txt
+baidupan-cli upload ./file.txt /remote/file.txt
+
+# 上传到指定目录
+baidupan-cli upload ./file.txt /remote/path/
 
 # 上传整个目录
-baidupan-cli upload ./local-directory /remote/path/
+baidupan-cli upload ./local-dir /remote/backup/
 
-# 从标准输入读取数据并上传
-echo "hello world" | baidupan-cli upload - /remote/hello.txt
+# 从标准输入读取并上传
+echo "hello" | baidupan-cli upload - /remote/hello.txt
+cat data.json | baidupan-cli upload - /remote/data.json
+
+# 指定并发数（提升大文件上传速度）
+baidupan-cli upload ./large-file.zip /remote/ -c 5
 ```
 
-参数说明：
-- `local`: 本地文件/目录路径，使用 `-` 表示从标准输入读取
-- `remote`: 远程路径
+**参数：**
 
-### 3. 下载文件 (download)
+| 参数 | 别名 | 说明 | 默认值 |
+|------|------|------|--------|
+| `local` | - | 本地路径（位置参数），使用 `-` 表示 stdin | 必填 |
+| `remote` | - | 远程路径（位置参数） | 必填 |
+| `--concurrency` | `-c` | 分块上传并发数 | `3` |
 
-从百度网盘下载文件到本地。
+#### download - 下载文件
+
+从百度网盘下载文件或目录到本地。
 
 ```bash
 # 下载文件到当前目录
 baidupan-cli download /remote/file.txt
 
-# 下载文件到指定位置
+# 下载文件到指定路径
 baidupan-cli download /remote/file.txt ./local-file.txt
 
 # 下载到指定目录
 baidupan-cli download /remote/file.txt ./downloads/
+
+# 递归下载整个目录
+baidupan-cli download /remote/directory ./local-dir -r
 ```
 
-参数说明：
-- `remote`: 远程文件路径
-- `local`: 本地保存路径（可选）
+**参数：**
 
-### 4. 其他别名
+| 参数 | 别名 | 说明 | 默认值 |
+|------|------|------|--------|
+| `remote` | - | 远程路径（位置参数） | 必填 |
+| `local` | - | 本地保存路径（位置参数） | `.` |
+| `--recursive` | `-r` | 递归下载目录 | `false` |
 
-- `ls` 是 `list` 的别名
-- `up` 是 `upload` 的别名
-- `dl` 是 `download` 的别名
+#### auth - 授权认证
 
-## 高级用法
+获取百度网盘授权。
+
+```bash
+baidupan-cli auth -k <app-key> -s <secret-key>
+
+# 使用自定义回调地址
+baidupan-cli auth -k <app-key> -s <secret-key> -r https://example.com/callback
+```
+
+**参数：**
+
+| 参数 | 别名 | 说明 | 默认值 |
+|------|------|------|--------|
+| `--appKey` | `-k` | 百度 App Key | 环境变量 |
+| `--secretKey` | `-s` | 百度 Secret Key | 环境变量 |
+| `--redirectUri` | `-r` | 回调地址 | `oob` |
+
+### 命令别名
+
+| 别名 | 完整命令 |
+|------|----------|
+| `ls` | `list` |
+| `up` | `upload` |
+| `dl` | `download` |
 
 ### 环境变量
 
-您可以设置以下环境变量来避免每次都需要提供认证信息：
+| 变量名 | 说明 |
+|--------|------|
+| `BAIDU_APP_KEY` | 百度 App Key |
+| `BAIDU_SECRET_KEY` | 百度 Secret Key |
+| `BAIDU_ACCESS_TOKEN` | Access Token（可选，优先级高于配置文件） |
+| `BAIDU_REFRESH_TOKEN` | Refresh Token（可选） |
 
-```bash
-export BAIDU_APP_KEY=your_app_key
-export BAIDU_SECRET_KEY=your_secret_key
-export BAIDU_ACCESS_TOKEN=your_access_token
-export BAIDU_REFRESH_TOKEN=your_refresh_token
-```
-
-### 配置文件位置
+### 配置文件
 
 认证信息默认保存在：
-- Windows: `%USERPROFILE%\.baidupan-cli\config.json`
-- macOS/Linux: `~/.baidupan-cli/config.json`
 
-## 故障排除
+- **Windows**: `%USERPROFILE%\.baidupan-cli\config.json`
+- **macOS/Linux**: `~/.baidupan-cli/config.json`
 
-### 授权问题
+配置文件格式：
 
-如果遇到授权问题，请检查：
-1. App Key 和 Secret Key 是否正确
-2. 重定向 URL 是否与百度开放平台设置一致
-3. 本地端口 9876 是否被占用
+```json
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "app_key": "...",
+  "secret_key": "...",
+  "expires_at": 1234567890000
+}
+```
 
-### 网络问题
+Token 过期后会自动刷新并保存。
 
-如果遇到网络连接问题，请确认：
-1. 能够正常访问百度网盘 API
-2. 没有网络代理阻止请求
+### 使用示例
 
-### 文件操作问题
+#### 备份本地目录到网盘
 
-- 确保远程路径格式正确（以 `/` 开头）
-- 检查是否有足够的权限访问指定路径
-- 大文件上传可能需要较长时间，请耐心等待
+```bash
+# 备份项目目录
+baidupan-cli upload ./my-project /备份/my-project/
 
-## 示例用法
+# 定时备份（配合 cron）
+0 2 * * * baidupan-cli upload /data/backup /备份/daily/
+```
 
-在 `example` 目录中提供了使用此工具的示例脚本，包括：
+#### 从网盘下载目录
 
-- 自动备份 MongoDB 数据库到百度网盘
-- 定时执行备份任务
-- 配置文件示例
+```bash
+# 下载整个目录
+baidupan-cli download /照片/2024 ./photos -r
+```
 
-更多信息请参见 `example/README.md`。
+#### 管道操作
 
-## 技术细节
+```bash
+# 备份数据库并上传
+mysqldump -u root mydb | baidupan-cli upload - /备份/mydb.sql
 
-该工具采用百度网盘开放平台 API，支持断点续传和秒传功能。大文件会被分割成多个块进行上传，确保上传过程的稳定性。
+# 列出文件并用 jq 处理
+baidupan-cli list /path --json | jq '.[] | select(.size > 1000000)'
+```
+
+### 故障排除
+
+#### 授权问题
+
+- 确认 App Key 和 Secret Key 正确
+- 如使用自定义回调地址，确保已在百度开放平台添加
+
+#### 网络问题
+
+- 确认能正常访问百度网盘 API
+- 工具已配置自动重试机制（3 次重试，指数退避）
+
+#### 文件操作
+
+- 远程路径需以 `/` 开头
+- 大文件上传会自动分块，请耐心等待
+- 支持秒传（相同文件无需重复上传）
+
+## License
+
+MIT

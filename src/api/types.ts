@@ -79,13 +79,7 @@ export interface UserInfo {
   uk: number
 }
 
-export interface UserInfoResponse extends BaiduApiResponse {
-  baidu_name: string
-  netdisk_name: string
-  avatar_url: string
-  vip_type: number
-  uk: number
-}
+export interface UserInfoResponse extends BaiduApiResponse, UserInfo {}
 
 // Quota types
 export interface QuotaResponse extends BaiduApiResponse {
