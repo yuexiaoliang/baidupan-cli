@@ -124,7 +124,6 @@ async function exchangeCodeForToken(
       redirect_uri: redirectUri,
     },
   }).catch((err) => {
-    console.log(`🚀 > exchangeCodeForToken > err:`, err.config)
     throw new AuthError(`Failed to exchange code for token: ${err.message}`)
   })
 

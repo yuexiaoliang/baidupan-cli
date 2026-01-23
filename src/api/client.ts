@@ -1,6 +1,6 @@
 import type { AxiosInstance } from 'axios'
 import { ApiError } from '../errors'
-import { BASE_URL, createHttpClient, http, OPENAPI_URL } from './http'
+import { BASE_URL, createHttpClient, OPENAPI_URL } from './http'
 import { tokenManager } from './token'
 import { BaiduErrorCodes } from './types'
 
@@ -19,26 +19,29 @@ export function createClient(): AxiosInstance {
 
   // Response interceptor for error handling and token refresh
   client.interceptors.response.use(
-    (response) => {
+    async (response) => {
       const data = response.data
+
+      // Check for API errors in response body (HTTP 200 but errno !== 0)
       if (data && typeof data.errno === 'number' && data.errno !== 0) {
+        // Check if token expired and try to refresh
+        if (tokenManager.isTokenExpiredError(data.errno)) {
+          const newToken = await tokenManager.refreshAccessToken()
+          if (newToken) {
+            // Retry the request with new token
+            const config = response.config
+            config.params = { ...config.params, access_token: newToken }
+            return client.request(config)
+          }
+        }
+
         const errorMsg = BaiduErrorCodes[data.errno] || `Unknown error: ${data.errno}`
         throw new ApiError(`Baidu API Error (${data.errno}): ${errorMsg}`, data.errno)
       }
       return response
     },
     async (error) => {
-      // Check if token expired and try to refresh
-      if (error.response?.data?.errno && tokenManager.isTokenExpiredError(error.response.data.errno)) {
-        const newToken = await tokenManager.refreshAccessToken()
-        if (newToken) {
-          // Retry the request with new token
-          const config = error.config
-          config.params = { ...config.params, access_token: newToken }
-          return http.request(config)
-        }
-      }
-
+      // Handle HTTP errors (4xx/5xx)
       if (error.response) {
         throw new ApiError(`HTTP Error: ${error.response.status} ${error.response.statusText}`)
       }

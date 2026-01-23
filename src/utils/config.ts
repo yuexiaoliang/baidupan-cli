@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { logger } from '../logger'
 
 const CONFIG_DIR = path.join(os.homedir(), '.baidupan-cli')
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json')
@@ -40,7 +41,7 @@ export function saveConfig(config: Config): void {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 })
   }
   catch (error) {
-    console.error('Warning: Failed to save config:', error instanceof Error ? error.message : error)
+    logger.warn('Failed to save config:', error instanceof Error ? error.message : error)
   }
 }
 
