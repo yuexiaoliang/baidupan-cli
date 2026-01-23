@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.1.1-beta.5",
   "packageManager": "pnpm@10.25.0",
-  "description": "CLI tool for Baidu Pan file management",
+  "description": "CLI tool for Baidu Pan (Baidu Netdisk) file management - 百度网盘命令行工具，支持上传、下载、文件管理",
   "author": {
     "name": "岳晓亮",
     "email": "hi@yuexiaoliang.com",
@@ -12,14 +12,29 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yuexiaoliang/baiduwangpan-manager"
+    "url": "https://github.com/yuexiaoliang/baidupan-cli"
   },
   "keywords": [
     "baidu",
     "baidupan",
+    "baidu-pan",
+    "baidu-netdisk",
     "netdisk",
+    "cloud-storage",
     "cli",
-    "backup"
+    "command-line",
+    "upload",
+    "download",
+    "backup",
+    "file-manager",
+    "百度网盘",
+    "百度云",
+    "网盘",
+    "云存储",
+    "文件管理",
+    "上传",
+    "下载",
+    "备份"
   ],
   "sideEffects": false,
   "exports": {
