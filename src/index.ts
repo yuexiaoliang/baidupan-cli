@@ -2,8 +2,12 @@
 import { createRequire } from 'node:module'
 import { defineCommand, runMain } from 'citty'
 import authCommand from './commands/auth'
+import copyCommand from './commands/cp'
 import downloadCommand from './commands/download'
 import listCommand from './commands/list'
+import moveCommand from './commands/mv'
+import renameCommand from './commands/rename'
+import deleteCommand from './commands/rm'
 import uploadCommand from './commands/upload'
 import { handleError } from './errors'
 import { setLogLevel } from './logger'
@@ -42,6 +46,13 @@ const main = defineCommand({
     up: uploadCommand,
     download: downloadCommand,
     dl: downloadCommand,
+    rm: deleteCommand,
+    delete: deleteCommand,
+    mv: moveCommand,
+    move: moveCommand,
+    cp: copyCommand,
+    copy: copyCommand,
+    rename: renameCommand,
   },
 })
 

@@ -89,6 +89,27 @@ export interface QuotaResponse extends BaiduApiResponse {
   expire: boolean
 }
 
+// File manager types
+export interface FileManagerOperationInfo {
+  path: string
+  dest?: string // for copy/move
+  newname?: string // for copy/move/rename
+}
+
+export interface FileManagerResultItem {
+  errno: number
+  path: string
+}
+
+export interface FileManagerResponse extends BaiduApiResponse {
+  info: FileManagerResultItem[]
+  taskid?: number // async mode only
+}
+
+export type FileManagerOperationType = 'copy' | 'move' | 'rename' | 'delete'
+
+export type OndupType = 'fail' | 'newcopy' | 'overwrite' | 'skip'
+
 // Error codes
 export const BaiduErrorCodes: Record<number, string> = {
   '0': 'Success',

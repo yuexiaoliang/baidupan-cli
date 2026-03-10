@@ -75,6 +75,32 @@ export function readFileAsBuffer(filePath: string): Buffer {
 }
 
 /**
+ * Open file for reading
+ */
+export function openFile(filePath: string): number {
+  return fs.openSync(filePath, 'r')
+}
+
+/**
+ * Close file descriptor
+ */
+export function closeFile(fd: number): void {
+  fs.closeSync(fd)
+}
+
+/**
+ * Read a chunk from file at specific position
+ */
+export function readFileChunk(fd: number, position: number, size: number): Buffer {
+  const buffer = Buffer.alloc(size)
+  const bytesRead = fs.readSync(fd, buffer, 0, size, position)
+  if (bytesRead < size) {
+    return buffer.subarray(0, bytesRead)
+  }
+  return buffer
+}
+
+/**
  * Read stdin as buffer
  */
 export async function readStdin(): Promise<Buffer> {

@@ -2,16 +2,18 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { defineCommand } from 'citty'
 import { createClient } from '../api/client'
-import { BaiduPanApi, splitIntoChunks } from '../api/file'
+import { BaiduPanApi, CHUNK_SIZE, md5 } from '../api/file'
 import { FileError } from '../errors'
 import { logger } from '../logger'
 import {
+  closeFile,
   formatSize,
   getAllFiles,
   isDirectory,
   normalizePath,
+  openFile,
   printProgress,
-  readFileAsBuffer,
+  readFileChunk,
   readStdin,
 } from '../utils'
 
@@ -77,8 +79,7 @@ export default defineCommand({
         const remoteFilePath = `${remotePath}/${file.relativePath}`
         logger.info(`\n正在上传: ${file.relativePath}`)
 
-        const data = readFileAsBuffer(file.localPath)
-        await uploadBuffer(api, data, remoteFilePath, concurrency)
+        await uploadFile(api, file.localPath, remoteFilePath, concurrency)
 
         uploaded++
         logger.info(`进度: ${uploaded}/${files.length} 个文件`)
@@ -89,13 +90,12 @@ export default defineCommand({
     }
 
     // Handle single file upload
-    const data = readFileAsBuffer(localPath)
     const fileName = path.basename(localPath)
     const finalRemotePath = remotePath.endsWith('/')
       ? `${remotePath}${fileName}`
       : remotePath
 
-    await uploadBuffer(api, data, finalRemotePath, concurrency)
+    await uploadFile(api, localPath, finalRemotePath, concurrency)
   },
 })
 
@@ -108,9 +108,18 @@ async function uploadBuffer(
   logger.info(`上传目标: ${remotePath}`)
   logger.info(`文件大小: ${formatSize(data.length)}`)
 
-  // Split into chunks and calculate MD5
-  const { chunks, md5List } = splitIntoChunks(data)
-  logger.debug(`分块数: ${chunks.length}`)
+  // Calculate MD5 for each chunk
+  const md5List: string[] = []
+  const totalChunks = Math.ceil(data.length / CHUNK_SIZE)
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE
+    const end = Math.min(start + CHUNK_SIZE, data.length)
+    const chunk = data.subarray(start, end)
+    md5List.push(md5(chunk))
+  }
+
+  logger.debug(`分块数: ${totalChunks}`)
 
   // Step 1: Precreate
   logger.start('预创建文件...')
@@ -136,7 +145,9 @@ async function uploadBuffer(
 
     const results = await Promise.all(
       batch.map(async (blockIndex) => {
-        const chunk = chunks[blockIndex]
+        const start = blockIndex * CHUNK_SIZE
+        const end = Math.min(start + CHUNK_SIZE, data.length)
+        const chunk = data.subarray(start, end)
         const result = await api.uploadChunk(uploadId, remotePath, blockIndex, chunk)
         completed++
         printProgress(completed, blocksToUpload.length, '上传中: ')
@@ -145,8 +156,8 @@ async function uploadBuffer(
     )
 
     // Update MD5 list with results
-    for (const { blockIndex, md5 } of results) {
-      uploadedMd5List[blockIndex] = md5
+    for (const { blockIndex, md5: chunkMd5 } of results) {
+      uploadedMd5List[blockIndex] = chunkMd5
     }
   }
 
@@ -155,6 +166,97 @@ async function uploadBuffer(
   const createResult = await api.createFile(
     remotePath,
     data.length,
+    uploadId,
+    uploadedMd5List,
+  )
+
+  logger.success(`上传完成！fs_id: ${createResult.fs_id}`)
+}
+
+async function uploadFile(
+  api: BaiduPanApi,
+  localPath: string,
+  remotePath: string,
+  concurrency: number,
+): Promise<void> {
+  const stats = fs.statSync(localPath)
+  const fileSize = stats.size
+
+  logger.info(`上传目标: ${remotePath}`)
+  logger.info(`文件大小: ${formatSize(fileSize)}`)
+
+  // Calculate total chunks and MD5 list
+  const totalChunks = Math.ceil(fileSize / CHUNK_SIZE)
+  const md5List: string[] = []
+
+  logger.start('计算文件分块 MD5...')
+  const fd = openFile(localPath)
+  try {
+    for (let i = 0; i < totalChunks; i++) {
+      const position = i * CHUNK_SIZE
+      const chunkSize = Math.min(CHUNK_SIZE, fileSize - position)
+      const chunk = readFileChunk(fd, position, chunkSize)
+      md5List.push(md5(chunk))
+    }
+  }
+  finally {
+    closeFile(fd)
+  }
+
+  logger.debug(`分块数: ${totalChunks}`)
+
+  // Step 1: Precreate
+  logger.start('预创建文件...')
+  const precreateResult = await api.precreate(remotePath, fileSize, md5List)
+
+  // Check if file already exists (return_type = 2)
+  if (precreateResult.return_type === 2) {
+    logger.success('秒传成功（文件已存在）')
+    return
+  }
+
+  const uploadId = precreateResult.uploadid
+  const blocksToUpload = precreateResult.block_list
+
+  // Step 2: Upload chunks with concurrency
+  logger.start('上传分块中...')
+  const uploadedMd5List: string[] = [...md5List]
+  let completed = 0
+
+  // Re-open file for uploading chunks
+  const uploadFd = openFile(localPath)
+  try {
+    // Process chunks in batches with concurrency limit
+    for (let i = 0; i < blocksToUpload.length; i += concurrency) {
+      const batch = blocksToUpload.slice(i, i + concurrency)
+
+      const results = await Promise.all(
+        batch.map(async (blockIndex) => {
+          const position = blockIndex * CHUNK_SIZE
+          const chunkSize = Math.min(CHUNK_SIZE, fileSize - position)
+          const chunk = readFileChunk(uploadFd, position, chunkSize)
+          const result = await api.uploadChunk(uploadId, remotePath, blockIndex, chunk)
+          completed++
+          printProgress(completed, blocksToUpload.length, '上传中: ')
+          return { blockIndex, md5: result.md5 }
+        }),
+      )
+
+      // Update MD5 list with results
+      for (const { blockIndex, md5: chunkMd5 } of results) {
+        uploadedMd5List[blockIndex] = chunkMd5
+      }
+    }
+  }
+  finally {
+    closeFile(uploadFd)
+  }
+
+  // Step 3: Create file
+  logger.start('创建文件...')
+  const createResult = await api.createFile(
+    remotePath,
+    fileSize,
     uploadId,
     uploadedMd5List,
   )

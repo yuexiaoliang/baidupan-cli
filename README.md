@@ -137,6 +137,119 @@ baidupan-cli download /remote/directory ./local-dir -r
 | `local` | - | 本地保存路径（位置参数） | `.` |
 | `--recursive` | `-r` | 递归下载目录 | `false` |
 
+#### rm - 删除文件/目录
+
+删除百度网盘中的文件或目录。
+
+```bash
+# 删除单个文件
+baidupan-cli rm /remote/file.txt
+
+# 删除多个文件
+baidupan-cli rm /file1.txt /file2.txt /dir1/
+
+# 使用异步模式删除
+baidupan-cli rm /large-directory -a
+
+# 输出 JSON 格式
+baidupan-cli rm /file.txt --json
+```
+
+**参数：**
+
+| 参数 | 别名 | 说明 | 默认值 |
+|------|------|------|--------|
+| `paths` | - | 要删除的路径（位置参数，支持多个） | 必填 |
+| `--async` | `-a` | 使用异步模式 | `false` |
+| `--json` | `-j` | 输出 JSON 格式 | `false` |
+
+#### mv - 移动/重命名文件
+
+移动或重命名百度网盘中的文件/目录。
+
+```bash
+# 移动文件到另一个目录
+baidupan-cli mv /old/file.txt /new/
+
+# 移动并重命名
+baidupan-cli mv /old/file.txt /new/newname.txt
+
+# 重命名（在同一目录下）
+baidupan-cli mv /dir/file.txt /dir/newname.txt
+
+# 覆盖已存在的文件
+baidupan-cli mv /file.txt /dest/ --ondup overwrite
+
+# 使用异步模式
+baidupan-cli mv /large-dir /new-location -a
+```
+
+**参数：**
+
+| 参数 | 别名 | 说明 | 默认值 |
+|------|------|------|--------|
+| `source` | - | 源路径（位置参数） | 必填 |
+| `dest` | - | 目标路径（位置参数） | 必填 |
+| `--ondup` | - | 冲突处理：fail/newcopy/overwrite/skip | `fail` |
+| `--async` | `-a` | 使用异步模式 | `false` |
+| `--json` | `-j` | 输出 JSON 格式 | `false` |
+
+#### cp - 复制文件/目录
+
+复制百度网盘中的文件或目录。
+
+```bash
+# 复制文件到另一个目录
+baidupan-cli cp /source/file.txt /backup/
+
+# 复制并重命名
+baidupan-cli cp /file.txt /backup/file-backup.txt
+
+# 重命名复制（在同一目录下）
+baidupan-cli cp /file.txt /file-copy.txt
+
+# 如果存在则跳过
+baidupan-cli cp /file.txt /dest/ --ondup skip
+
+# 使用异步模式（复制大目录时推荐）
+baidupan-cli cp /large-directory /backup/ -a
+```
+
+**参数：**
+
+| 参数 | 别名 | 说明 | 默认值 |
+|------|------|------|--------|
+| `source` | - | 源路径（位置参数） | 必填 |
+| `dest` | - | 目标路径（位置参数） | 必填 |
+| `--ondup` | - | 冲突处理：fail/newcopy/overwrite/skip | `fail` |
+| `--async` | `-a` | 使用异步模式 | `false` |
+| `--json` | `-j` | 输出 JSON 格式 | `false` |
+
+#### rename - 重命名文件/目录
+
+重命名百度网盘中的文件或目录（mv 的便捷替代）。
+
+```bash
+# 重命名文件
+baidupan-cli rename /path/oldname.txt newname.txt
+
+# 重命名目录
+baidupan-cli rename /path/old-dir new-dir
+
+# 如果存在则覆盖
+baidupan-cli rename /file.txt newname.txt --ondup overwrite
+```
+
+**参数：**
+
+| 参数 | 别名 | 说明 | 默认值 |
+|------|------|------|--------|
+| `path` | - | 要重命名的文件/目录路径（位置参数） | 必填 |
+| `newname` | - | 新名称（位置参数） | 必填 |
+| `--ondup` | - | 冲突处理：fail/newcopy/overwrite/skip | `fail` |
+| `--async` | `-a` | 使用异步模式 | `false` |
+| `--json` | `-j` | 输出 JSON 格式 | `false` |
+
 #### auth - 授权认证
 
 获取百度网盘授权。
@@ -163,6 +276,9 @@ baidupan-cli auth -k <app-key> -s <secret-key> -r https://example.com/callback
 | `ls` | `list` |
 | `up` | `upload` |
 | `dl` | `download` |
+| `rm` | `delete` |
+| `mv` | `move` |
+| `cp` | `copy` |
 
 ### 环境变量
 
@@ -203,11 +319,28 @@ Token 过期后会自动刷新并保存。
 baidupan-cli upload ./my-project /备份/my-project/
 ```
 
-#### 从网盘下载目录
+#### 网盘文件管理
 
 ```bash
-# 下载整个目录
-baidupan-cli download /照片/2024 ./photos -r
+# 删除文件
+baidupan-cli rm /old-file.txt
+
+# 重命名文件
+baidupan-cli rename /file.txt document.txt
+# 或使用 mv
+baidupan-cli mv /file.txt /document.txt
+
+# 移动文件到另一个目录
+baidupan-cli mv /temp/file.txt /documents/
+
+# 复制文件备份
+baidupan-cli cp /important.doc /backups/important-backup.doc
+
+# 批量删除
+baidupan-cli rm /temp/file1.txt /temp/file2.txt /temp/old/
+
+# 递归复制整个目录（异步模式）
+baidupan-cli cp /projects/myapp /backups/myapp -a
 ```
 
 #### 在 Node.js 脚本中使用

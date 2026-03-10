@@ -1,8 +1,11 @@
 import type { AxiosInstance } from 'axios'
 import type {
   CreateFileResponse,
+  FileManagerOperationType,
+  FileManagerResponse,
   FileMetasResponse,
   ListFilesResponse,
+  OndupType,
   PrecreateResponse,
   QuotaResponse,
   UserInfoResponse,
@@ -171,6 +174,39 @@ export class BaiduPanApi {
    */
   async createDir(path: string): Promise<CreateFileResponse> {
     return this.createFile(path, 0, '', [], true)
+  }
+
+  /**
+   * File manager operations: copy, move, rename, delete
+   */
+  async fileManager(
+    opera: FileManagerOperationType,
+    fileList: Array<{
+      path: string
+      dest?: string
+      newname?: string
+    }>,
+    options?: {
+      async?: 0 | 1 | 2
+      ondup?: OndupType
+    },
+  ): Promise<FileManagerResponse> {
+    const params = new URLSearchParams()
+    params.append('async', (options?.async ?? 0).toString())
+    params.append('filelist', JSON.stringify(fileList))
+    if (options?.ondup) {
+      params.append('ondup', options.ondup)
+    }
+
+    const response = await this.client.post<FileManagerResponse>(
+      '/rest/2.0/xpan/file',
+      params.toString(),
+      {
+        params: { method: 'filemanager', opera },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      },
+    )
+    return response.data
   }
 }
 
