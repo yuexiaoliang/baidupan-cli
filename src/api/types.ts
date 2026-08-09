@@ -60,6 +60,14 @@ export interface UploadChunkResponse extends BaiduApiResponse {
   md5: string
 }
 
+export interface UploadServer {
+  server: string
+}
+
+export interface LocateUploadResponse extends BaiduApiResponse {
+  servers?: UploadServer[]
+}
+
 export interface CreateFileResponse extends BaiduApiResponse {
   fs_id: number
   path: string

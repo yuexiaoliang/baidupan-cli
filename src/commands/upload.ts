@@ -133,6 +133,8 @@ async function uploadBuffer(
 
   const uploadId = precreateResult.uploadid
   const blocksToUpload = precreateResult.block_list
+  const uploadServer = await api.locateUpload(remotePath, uploadId)
+  logger.debug(`上传节点: ${uploadServer}`)
 
   // Step 2: Upload chunks with concurrency
   logger.start('上传分块中...')
@@ -148,7 +150,13 @@ async function uploadBuffer(
         const start = blockIndex * CHUNK_SIZE
         const end = Math.min(start + CHUNK_SIZE, data.length)
         const chunk = data.subarray(start, end)
-        const result = await api.uploadChunk(uploadId, remotePath, blockIndex, chunk)
+        const result = await api.uploadChunk(
+          uploadId,
+          remotePath,
+          blockIndex,
+          chunk,
+          uploadServer,
+        )
         completed++
         printProgress(completed, blocksToUpload.length, '上传中: ')
         return { blockIndex, md5: result.md5 }
@@ -217,6 +225,8 @@ async function uploadFile(
 
   const uploadId = precreateResult.uploadid
   const blocksToUpload = precreateResult.block_list
+  const uploadServer = await api.locateUpload(remotePath, uploadId)
+  logger.debug(`上传节点: ${uploadServer}`)
 
   // Step 2: Upload chunks with concurrency
   logger.start('上传分块中...')
@@ -235,7 +245,13 @@ async function uploadFile(
           const position = blockIndex * CHUNK_SIZE
           const chunkSize = Math.min(CHUNK_SIZE, fileSize - position)
           const chunk = readFileChunk(uploadFd, position, chunkSize)
-          const result = await api.uploadChunk(uploadId, remotePath, blockIndex, chunk)
+          const result = await api.uploadChunk(
+            uploadId,
+            remotePath,
+            blockIndex,
+            chunk,
+            uploadServer,
+          )
           completed++
           printProgress(completed, blocksToUpload.length, '上传中: ')
           return { blockIndex, md5: result.md5 }

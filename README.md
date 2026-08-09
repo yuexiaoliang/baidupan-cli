@@ -111,6 +111,8 @@ baidupan-cli upload ./large-file.zip /remote/ -c 5
 | `remote` | - | 远程路径（位置参数） | 必填 |
 | `--concurrency` | `-c` | 分块上传并发数 | `3` |
 
+上传前会通过百度 `locateupload` 接口选择当前可用的 HTTPS 上传节点；动态节点获取失败时回退到 `https://d.pcs.baidu.com`。每个分块最多尝试 3 次，重试时会重新创建上传请求，避免复用已经消费的 multipart 数据流。
+
 #### download - 下载文件
 
 从百度网盘下载文件或目录到本地。
@@ -288,6 +290,7 @@ baidupan-cli auth -k <app-key> -s <secret-key> -r https://example.com/callback
 | `BAIDU_SECRET_KEY` | 百度 Secret Key |
 | `BAIDU_ACCESS_TOKEN` | Access Token（可选，优先级高于配置文件） |
 | `BAIDU_REFRESH_TOKEN` | Refresh Token（可选） |
+| `BAIDUPAN_TIMEOUT_MS` | HTTP 请求超时毫秒数（默认 `300000`，即 5 分钟） |
 
 ### 配置文件
 
@@ -387,7 +390,10 @@ cron.schedule('0 2 * * *', () => {
 #### 网络问题
 
 - 确认能正常访问百度网盘 API
-- 工具已配置自动重试机制（3 次重试，指数退避）
+- 使用 `--verbose` 查看实际选择的上传节点
+- 分块上传失败时会重新创建请求并最多尝试 3 次
+- 默认 HTTP 超时为 5 分钟，可通过 `BAIDUPAN_TIMEOUT_MS` 调整
+- 如果动态上传节点获取失败，工具会自动回退到默认节点
 
 #### 文件操作
 
