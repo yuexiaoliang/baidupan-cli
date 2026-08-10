@@ -1,4 +1,5 @@
 import type { AxiosInstance } from 'axios'
+import { AxiosError } from 'axios'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BaiduPanApi } from '../src/api/file'
 import { ApiError } from '../src/errors'
@@ -23,6 +24,8 @@ describe('baiduPanApi upload routing', () => {
         servers: [
           { server: 'http://c1.pcs.baidu.com' },
           { server: 'https://c9.pcs.baidu.com/' },
+          { server: 'https://c8.pcs.baidu.com' },
+          { server: 'https://c9.pcs.baidu.com/' },
         ],
       },
     })
@@ -30,7 +33,11 @@ describe('baiduPanApi upload routing', () => {
 
     await expect(api.locateUpload('/backup.tar', 'upload-id'))
       .resolves
-      .toBe('https://c9.pcs.baidu.com')
+      .toEqual([
+        'https://c9.pcs.baidu.com',
+        'https://c8.pcs.baidu.com',
+        'https://d.pcs.baidu.com',
+      ])
     expect(client.get).toHaveBeenCalledWith(
       'https://d.pcs.baidu.com/rest/2.0/pcs/file',
       {
@@ -52,7 +59,7 @@ describe('baiduPanApi upload routing', () => {
 
     await expect(api.locateUpload('/backup.tar', 'upload-id'))
       .resolves
-      .toBe('https://d.pcs.baidu.com')
+      .toEqual(['https://d.pcs.baidu.com'])
   })
 
   it('falls back to the default server when discovery fails', async () => {
@@ -62,12 +69,15 @@ describe('baiduPanApi upload routing', () => {
 
     await expect(api.locateUpload('/backup.tar', 'upload-id'))
       .resolves
-      .toBe('https://d.pcs.baidu.com')
+      .toEqual(['https://d.pcs.baidu.com'])
   })
 
-  it('rebuilds multipart data before retrying a transient chunk failure', async () => {
+  it('refreshes the server pool and rebuilds multipart data before retrying', async () => {
     vi.useFakeTimers()
     const client = createClient()
+    vi.mocked(client.get).mockResolvedValue({
+      data: { servers: [{ server: 'https://c8.pcs.baidu.com' }] },
+    })
     vi.mocked(client.post)
       .mockRejectedValueOnce(new ApiError('HTTP Error: 500', undefined, 500))
       .mockResolvedValueOnce({ data: { md5: 'chunk-md5' } })
@@ -78,7 +88,7 @@ describe('baiduPanApi upload routing', () => {
       '/backup.tar',
       0,
       Buffer.from('chunk'),
-      'https://c9.pcs.baidu.com',
+      ['https://c9.pcs.baidu.com', 'https://d.pcs.baidu.com'],
     )
     await vi.advanceTimersByTimeAsync(1_000)
 
@@ -86,9 +96,39 @@ describe('baiduPanApi upload routing', () => {
     expect(client.post).toHaveBeenCalledTimes(2)
     expect(vi.mocked(client.post).mock.calls[0][0])
       .toBe('https://c9.pcs.baidu.com/rest/2.0/pcs/superfile2')
+    expect(vi.mocked(client.post).mock.calls[1][0])
+      .toBe('https://c8.pcs.baidu.com/rest/2.0/pcs/superfile2')
     expect(vi.mocked(client.post).mock.calls[0][1])
       .not
       .toBe(vi.mocked(client.post).mock.calls[1][1])
+  })
+
+  it('switches servers after a connection timeout', async () => {
+    vi.useFakeTimers()
+    const client = createClient()
+    vi.mocked(client.get).mockResolvedValue({
+      data: { servers: [{ server: 'https://c8.pcs.baidu.com' }] },
+    })
+    vi.mocked(client.post)
+      .mockRejectedValueOnce(new AxiosError('connect ETIMEDOUT', 'ETIMEDOUT'))
+      .mockResolvedValueOnce({ data: { md5: 'chunk-md5' } })
+    const api = new BaiduPanApi(client)
+
+    const upload = api.uploadChunk(
+      'upload-id',
+      '/backup.tar',
+      49,
+      Buffer.from('chunk'),
+      ['https://c9.pcs.baidu.com', 'https://d.pcs.baidu.com'],
+    )
+    await vi.advanceTimersByTimeAsync(1_000)
+
+    await expect(upload).resolves.toEqual({ md5: 'chunk-md5' })
+    expect(vi.mocked(client.post).mock.calls.map(call => call[0]))
+      .toEqual([
+        'https://c9.pcs.baidu.com/rest/2.0/pcs/superfile2',
+        'https://c8.pcs.baidu.com/rest/2.0/pcs/superfile2',
+      ])
   })
 
   it('does not retry a non-retryable client error', async () => {
@@ -102,7 +142,7 @@ describe('baiduPanApi upload routing', () => {
       '/backup.tar',
       0,
       Buffer.from('chunk'),
-      'https://c9.pcs.baidu.com',
+      ['https://c9.pcs.baidu.com'],
     )).rejects.toThrow('HTTP Error: 400')
     expect(client.post).toHaveBeenCalledTimes(1)
   })

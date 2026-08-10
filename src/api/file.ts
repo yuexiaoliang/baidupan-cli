@@ -42,6 +42,14 @@ function wait(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+function normalizeUploadServers(servers: string[]): string[] {
+  const dynamicServers = servers
+    .map(server => server.replace(/\/$/, ''))
+    .filter(server => server.startsWith('https://') && server !== DEFAULT_UPLOAD_SERVER)
+
+  return [...new Set([...dynamicServers, DEFAULT_UPLOAD_SERVER])]
+}
+
 export class BaiduPanApi {
   constructor(private client: AxiosInstance) {}
 
@@ -134,7 +142,7 @@ export class BaiduPanApi {
    * Get the currently recommended upload server.
    * Falls back to the legacy endpoint when discovery is unavailable.
    */
-  async locateUpload(path: string, uploadId: string): Promise<string> {
+  async locateUpload(path: string, uploadId: string): Promise<string[]> {
     try {
       const response = await this.client.get<LocateUploadResponse>(
         `${DEFAULT_UPLOAD_SERVER}/rest/2.0/pcs/file`,
@@ -148,14 +156,14 @@ export class BaiduPanApi {
           },
         },
       )
-      const server = response.data.servers?.find(item => item.server.startsWith('https://'))
-        ?.server
-      return (server || DEFAULT_UPLOAD_SERVER).replace(/\/$/, '')
+      return normalizeUploadServers(
+        response.data.servers?.map(item => item.server) || [],
+      )
     }
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       logger.warn(`获取动态上传节点失败，回退到默认节点: ${message}`)
-      return DEFAULT_UPLOAD_SERVER
+      return [DEFAULT_UPLOAD_SERVER]
     }
   }
 
@@ -167,12 +175,17 @@ export class BaiduPanApi {
     path: string,
     partseq: number,
     data: Buffer,
-    uploadServer: string = DEFAULT_UPLOAD_SERVER,
+    uploadServers: string[] = [DEFAULT_UPLOAD_SERVER],
   ): Promise<{ md5: string }> {
     const token = this.client.defaults.params?.access_token
-    const normalizedServer = uploadServer.replace(/\/$/, '')
+    let serverPool = normalizeUploadServers(uploadServers)
+    const attemptedServers = new Set<string>()
 
     for (let attempt = 1; attempt <= MAX_CHUNK_UPLOAD_ATTEMPTS; attempt++) {
+      const uploadServer = serverPool.find(server => !attemptedServers.has(server))
+        || serverPool[(attempt - 1) % serverPool.length]
+      attemptedServers.add(uploadServer)
+
       const form = new FormData()
       form.append('file', data, {
         filename: 'chunk',
@@ -181,7 +194,7 @@ export class BaiduPanApi {
 
       try {
         const response = await this.client.post(
-          `${normalizedServer}/rest/2.0/pcs/superfile2`,
+          `${uploadServer}/rest/2.0/pcs/superfile2`,
           form,
           {
             'axios-retry': { retries: 0 },
@@ -205,10 +218,14 @@ export class BaiduPanApi {
           throw error
         }
 
+        const refreshedServers = await this.locateUpload(path, uploadId)
+        serverPool = normalizeUploadServers([...serverPool, ...refreshedServers])
+        const nextServer = serverPool.find(server => !attemptedServers.has(server))
+          || serverPool[attempt % serverPool.length]
         const delay = CHUNK_RETRY_BASE_DELAY * 2 ** (attempt - 1)
         const message = error instanceof Error ? error.message : String(error)
         logger.warn(
-          `分块 ${partseq} 上传失败，第 ${attempt}/${MAX_CHUNK_UPLOAD_ATTEMPTS} 次尝试: ${message}；${delay / 1_000} 秒后重试`,
+          `分块 ${partseq} 上传失败，第 ${attempt}/${MAX_CHUNK_UPLOAD_ATTEMPTS} 次尝试: ${message}；切换节点: ${nextServer}；${delay / 1_000} 秒后重试`,
         )
         await wait(delay)
       }
