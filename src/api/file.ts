@@ -20,6 +20,7 @@ import { logger } from '../logger'
 // 4MB chunk size for upload
 const CHUNK_SIZE = 4 * 1024 * 1024
 const DEFAULT_UPLOAD_SERVER = 'https://d.pcs.baidu.com'
+const UPLOAD_SERVER_PROBE_TIMEOUT = 5_000
 const MAX_CHUNK_UPLOAD_ATTEMPTS = 3
 const CHUNK_RETRY_BASE_DELAY = 1_000
 
@@ -165,6 +166,38 @@ export class BaiduPanApi {
       logger.warn(`获取动态上传节点失败，回退到默认节点: ${message}`)
       return [DEFAULT_UPLOAD_SERVER]
     }
+  }
+
+  /**
+   * Probe all discovered upload servers in parallel and prefer the lowest
+   * response latency. A HEAD request carries no file data and does not create
+   * an upload part. Unreachable servers remain at the end as fallbacks.
+   */
+  async rankUploadServers(servers: string[]): Promise<string[]> {
+    const serverPool = normalizeUploadServers(servers)
+    const results = await Promise.all(serverPool.map(async (server, index) => {
+      const startedAt = performance.now()
+
+      try {
+        await this.client.head(`${server}/rest/2.0/pcs/superfile2`, {
+          'axios-retry': { retries: 0 },
+          'timeout': UPLOAD_SERVER_PROBE_TIMEOUT,
+          'validateStatus': () => true,
+        })
+        const latency = performance.now() - startedAt
+        logger.debug(`上传节点测速: ${server} ${Math.round(latency)}ms`)
+        return { index, latency, server }
+      }
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        logger.debug(`上传节点测速: ${server} 不可达 (${message})`)
+        return { index, latency: Number.POSITIVE_INFINITY, server }
+      }
+    }))
+
+    return results
+      .sort((a, b) => a.latency - b.latency || a.index - b.index)
+      .map(result => result.server)
   }
 
   /**

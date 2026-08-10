@@ -8,6 +8,7 @@ function createClient(): AxiosInstance {
   return {
     defaults: { params: { access_token: 'test-token' } },
     get: vi.fn(),
+    head: vi.fn(),
     post: vi.fn(),
   } as unknown as AxiosInstance
 }
@@ -70,6 +71,47 @@ describe('baiduPanApi upload routing', () => {
     await expect(api.locateUpload('/backup.tar', 'upload-id'))
       .resolves
       .toEqual(['https://d.pcs.baidu.com'])
+  })
+
+  it('ranks reachable upload servers by probe latency and leaves unreachable servers last', async () => {
+    vi.useFakeTimers()
+    const client = createClient()
+    vi.mocked(client.head).mockImplementation((url) => {
+      const delay = String(url).includes('c9.') ? 30 : 5
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          if (String(url).includes('d.pcs')) {
+            reject(new AxiosError('connect ETIMEDOUT', 'ETIMEDOUT'))
+          }
+          else {
+            resolve({ data: {}, status: 400 })
+          }
+        }, delay)
+      })
+    })
+    const api = new BaiduPanApi(client)
+
+    const ranking = api.rankUploadServers([
+      'https://c9.pcs.baidu.com',
+      'https://c2.pcs.baidu.com',
+      'https://d.pcs.baidu.com',
+    ])
+    await vi.advanceTimersByTimeAsync(30)
+
+    await expect(ranking).resolves.toEqual([
+      'https://c2.pcs.baidu.com',
+      'https://c9.pcs.baidu.com',
+      'https://d.pcs.baidu.com',
+    ])
+    expect(client.head).toHaveBeenCalledTimes(3)
+    expect(client.head).toHaveBeenCalledWith(
+      'https://c2.pcs.baidu.com/rest/2.0/pcs/superfile2',
+      expect.objectContaining({
+        'timeout': 5_000,
+        'validateStatus': expect.any(Function),
+        'axios-retry': { retries: 0 },
+      }),
+    )
   })
 
   it('refreshes the server pool and rebuilds multipart data before retrying', async () => {
