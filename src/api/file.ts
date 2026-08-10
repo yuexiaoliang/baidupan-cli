@@ -5,16 +5,51 @@ import type {
   FileManagerResponse,
   FileMetasResponse,
   ListFilesResponse,
+  LocateUploadResponse,
   OndupType,
   PrecreateResponse,
   QuotaResponse,
   UserInfoResponse,
 } from './types'
 import crypto from 'node:crypto'
+import axios from 'axios'
 import FormData from 'form-data'
+import { ApiError } from '../errors'
+import { logger } from '../logger'
 
 // 4MB chunk size for upload
 const CHUNK_SIZE = 4 * 1024 * 1024
+const DEFAULT_UPLOAD_SERVER = 'https://d.pcs.baidu.com'
+const UPLOAD_SERVER_PROBE_TIMEOUT = 5_000
+const MAX_CHUNK_UPLOAD_ATTEMPTS = 3
+const CHUNK_RETRY_BASE_DELAY = 1_000
+
+function isRetryableChunkError(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return error.errno === 31034
+      || error.httpStatus === 429
+      || (error.httpStatus ?? 0) >= 500
+  }
+
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status
+    return status === undefined || status === 429 || status >= 500
+  }
+
+  return false
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function normalizeUploadServers(servers: string[]): string[] {
+  const dynamicServers = servers
+    .map(server => server.replace(/\/$/, ''))
+    .filter(server => server.startsWith('https://') && server !== DEFAULT_UPLOAD_SERVER)
+
+  return [...new Set([...dynamicServers, DEFAULT_UPLOAD_SERVER])]
+}
 
 export class BaiduPanApi {
   constructor(private client: AxiosInstance) {}
@@ -105,6 +140,67 @@ export class BaiduPanApi {
   }
 
   /**
+   * Get the currently recommended upload server.
+   * Falls back to the legacy endpoint when discovery is unavailable.
+   */
+  async locateUpload(path: string, uploadId: string): Promise<string[]> {
+    try {
+      const response = await this.client.get<LocateUploadResponse>(
+        `${DEFAULT_UPLOAD_SERVER}/rest/2.0/pcs/file`,
+        {
+          params: {
+            method: 'locateupload',
+            appid: '250528',
+            path,
+            uploadid: uploadId,
+            upload_version: '2.0',
+          },
+        },
+      )
+      return normalizeUploadServers(
+        response.data.servers?.map(item => item.server) || [],
+      )
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.warn(`获取动态上传节点失败，回退到默认节点: ${message}`)
+      return [DEFAULT_UPLOAD_SERVER]
+    }
+  }
+
+  /**
+   * Probe all discovered upload servers in parallel and prefer the lowest
+   * response latency. A HEAD request carries no file data and does not create
+   * an upload part. Unreachable servers remain at the end as fallbacks.
+   */
+  async rankUploadServers(servers: string[]): Promise<string[]> {
+    const serverPool = normalizeUploadServers(servers)
+    const results = await Promise.all(serverPool.map(async (server, index) => {
+      const startedAt = performance.now()
+
+      try {
+        await this.client.head(`${server}/rest/2.0/pcs/superfile2`, {
+          'axios-retry': { retries: 0 },
+          'timeout': UPLOAD_SERVER_PROBE_TIMEOUT,
+          'validateStatus': () => true,
+        })
+        const latency = performance.now() - startedAt
+        logger.debug(`上传节点测速: ${server} ${Math.round(latency)}ms`)
+        return { index, latency, server }
+      }
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        logger.debug(`上传节点测速: ${server} 不可达 (${message})`)
+        return { index, latency: Number.POSITIVE_INFINITY, server }
+      }
+    }))
+
+    return results
+      .sort((a, b) => a.latency - b.latency || a.index - b.index)
+      .map(result => result.server)
+  }
+
+  /**
    * Upload a chunk
    */
   async uploadChunk(
@@ -112,32 +208,63 @@ export class BaiduPanApi {
     path: string,
     partseq: number,
     data: Buffer,
+    uploadServers: string[] = [DEFAULT_UPLOAD_SERVER],
   ): Promise<{ md5: string }> {
-    const form = new FormData()
-    form.append('file', data, {
-      filename: 'chunk',
-      contentType: 'application/octet-stream',
-    })
-
     const token = this.client.defaults.params?.access_token
-    const response = await this.client.post(
-      'https://d.pcs.baidu.com/rest/2.0/pcs/superfile2',
-      form,
-      {
-        params: {
-          method: 'upload',
-          access_token: token,
-          type: 'tmpfile',
-          path,
-          uploadid: uploadId,
-          partseq,
-        },
-        headers: form.getHeaders(),
-        maxBodyLength: Number.POSITIVE_INFINITY,
-        maxContentLength: Number.POSITIVE_INFINITY,
-      },
-    )
-    return response.data
+    let serverPool = normalizeUploadServers(uploadServers)
+    const attemptedServers = new Set<string>()
+
+    for (let attempt = 1; attempt <= MAX_CHUNK_UPLOAD_ATTEMPTS; attempt++) {
+      const uploadServer = serverPool.find(server => !attemptedServers.has(server))
+        || serverPool[(attempt - 1) % serverPool.length]
+      attemptedServers.add(uploadServer)
+
+      const form = new FormData()
+      form.append('file', data, {
+        filename: 'chunk',
+        contentType: 'application/octet-stream',
+      })
+
+      try {
+        const response = await this.client.post(
+          `${uploadServer}/rest/2.0/pcs/superfile2`,
+          form,
+          {
+            'axios-retry': { retries: 0 },
+            'params': {
+              method: 'upload',
+              access_token: token,
+              type: 'tmpfile',
+              path,
+              uploadid: uploadId,
+              partseq,
+            },
+            'headers': form.getHeaders(),
+            'maxBodyLength': Number.POSITIVE_INFINITY,
+            'maxContentLength': Number.POSITIVE_INFINITY,
+          },
+        )
+        return response.data
+      }
+      catch (error) {
+        if (!isRetryableChunkError(error) || attempt === MAX_CHUNK_UPLOAD_ATTEMPTS) {
+          throw error
+        }
+
+        const refreshedServers = await this.locateUpload(path, uploadId)
+        serverPool = normalizeUploadServers([...serverPool, ...refreshedServers])
+        const nextServer = serverPool.find(server => !attemptedServers.has(server))
+          || serverPool[attempt % serverPool.length]
+        const delay = CHUNK_RETRY_BASE_DELAY * 2 ** (attempt - 1)
+        const message = error instanceof Error ? error.message : String(error)
+        logger.warn(
+          `分块 ${partseq} 上传失败，第 ${attempt}/${MAX_CHUNK_UPLOAD_ATTEMPTS} 次尝试: ${message}；切换节点: ${nextServer}；${delay / 1_000} 秒后重试`,
+        )
+        await wait(delay)
+      }
+    }
+
+    throw new Error(`分块 ${partseq} 上传失败`)
   }
 
   /**

@@ -6,8 +6,15 @@ import { logger } from '../logger'
 export const BASE_URL = 'https://pan.baidu.com'
 export const OPENAPI_URL = 'https://openapi.baidu.com'
 
-const DEFAULT_TIMEOUT = 30000
+const FALLBACK_TIMEOUT = 300_000
 const DEFAULT_USER_AGENT = 'pan.baidu.com'
+
+export function resolveRequestTimeout(value = process.env.BAIDUPAN_TIMEOUT_MS): number {
+  const timeout = Number.parseInt(value || '', 10)
+  return Number.isFinite(timeout) && timeout > 0 ? timeout : FALLBACK_TIMEOUT
+}
+
+const DEFAULT_TIMEOUT = resolveRequestTimeout()
 
 /**
  * Base axios instance with common configuration

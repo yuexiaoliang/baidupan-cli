@@ -28,6 +28,7 @@ export class ApiError extends CliError {
   constructor(
     message: string,
     public readonly errno?: number,
+    public readonly httpStatus?: number,
   ) {
     super(message, 1)
     this.name = 'ApiError'

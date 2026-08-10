@@ -43,7 +43,11 @@ export function createClient(): AxiosInstance {
     async (error) => {
       // Handle HTTP errors (4xx/5xx)
       if (error.response) {
-        throw new ApiError(`HTTP Error: ${error.response.status} ${error.response.statusText}`)
+        throw new ApiError(
+          `HTTP Error: ${error.response.status} ${error.response.statusText}`,
+          undefined,
+          error.response.status,
+        )
       }
       throw error
     },
