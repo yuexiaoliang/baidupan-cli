@@ -1,3 +1,8 @@
+
+</think>
+/
+</think>
+
 # baidupan-cli
 
 基于命令行的百度网盘管理工具，支持上传、下载、列出文件等操作。
@@ -109,7 +114,7 @@ baidupan-cli upload ./large-file.zip /remote/ -c 5
 |------|------|------|--------|
 | `local` | - | 本地路径（位置参数），使用 `-` 表示 stdin | 必填 |
 | `remote` | - | 远程路径（位置参数） | 必填 |
-| `--concurrency` | `-c` | 分块上传并发数 | `3` |
+| `--concurrency` | `-c` | 分块上传并发数（默认分块大小 4MB） | `3` |
 
 #### download - 下载文件
 
